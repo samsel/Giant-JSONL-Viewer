@@ -76,6 +76,9 @@ This project has no npm runtime dependencies, but `package.json` includes conven
 ```sh
 npm run build:wasm
 npm run check:wasm
+npm run format
+npm run format:check
+npm run lint
 npm run serve
 npm run dev
 ```
@@ -151,6 +154,26 @@ This repo includes a GitHub Actions workflow at `.github/workflows/pages.yml`.
 After pushing to GitHub, enable Pages with **Settings → Pages → Build and deployment → GitHub Actions**.
 
 The workflow builds the Rust/WASM artifact and deploys the static app.
+
+## Quality Checks
+
+This repo includes a CI workflow at `.github/workflows/ci.yml`.
+
+Local checks:
+
+```sh
+npm run format:check
+npm run lint
+npm run check:wasm
+npm run build:wasm
+```
+
+Tooling:
+
+- Prettier for HTML, CSS, JavaScript, Markdown, JSON, and YAML
+- ESLint for browser, worker, and Node helper scripts
+- rustfmt for Rust formatting
+- clippy with `-D warnings` for Rust linting
 
 ## Notes
 

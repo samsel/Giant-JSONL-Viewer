@@ -106,7 +106,9 @@ async function generate() {
     if (i > 0 && i % 250000 === 0) {
       const elapsed = ((Date.now() - started) / 1000).toFixed(1);
       const size = fs.existsSync(tmp) ? fs.statSync(tmp).size : 0;
-      console.error(`${i.toLocaleString()} rows written · ${(size / 1024 / 1024).toFixed(1)} MB · ${elapsed}s`);
+      console.error(
+        `${i.toLocaleString()} rows written · ${(size / 1024 / 1024).toFixed(1)} MB · ${elapsed}s`
+      );
     }
   }
 
@@ -119,7 +121,9 @@ async function generate() {
   fs.renameSync(tmp, output);
   const size = fs.statSync(output).size;
   const elapsed = ((Date.now() - started) / 1000).toFixed(1);
-  console.error(`done · ${total.toLocaleString()} rows · ${(size / 1024 / 1024).toFixed(1)} MB · ${elapsed}s`);
+  console.error(
+    `done · ${total.toLocaleString()} rows · ${(size / 1024 / 1024).toFixed(1)} MB · ${elapsed}s`
+  );
 }
 
 generate().catch((error) => {

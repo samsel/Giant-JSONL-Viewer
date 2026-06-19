@@ -3,6 +3,9 @@
 # Rust build artifacts
 /target/
 
+# Node dependencies
+/node_modules/
+
 # Local JSONL datasets and generated stress files
 /sample/
 *.jsonl

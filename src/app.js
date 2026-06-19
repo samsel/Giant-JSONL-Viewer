@@ -42,7 +42,7 @@ const els = {
 
 try {
   worker = new Worker("./src/worker.js", { type: "module" });
-} catch (error) {
+} catch (_error) {
   showFatal(
     "This browser blocked the worker. Serve the app from http://localhost:8765/index.html instead of opening index.html directly."
   );
@@ -59,42 +59,47 @@ function callWorker(type, payload = {}, transfer) {
   });
 }
 
-if (worker) worker.onmessage = (event) => {
-  const message = event.data;
-  if (message.id && pending.has(message.id)) {
-    const { resolve, reject } = pending.get(message.id);
-    pending.delete(message.id);
-    if (message.error) reject(new Error(message.error));
-    else resolve(message);
-    return;
-  }
+if (worker)
+  worker.onmessage = (event) => {
+    const message = event.data;
+    if (message.id && pending.has(message.id)) {
+      const { resolve, reject } = pending.get(message.id);
+      pending.delete(message.id);
+      if (message.error) reject(new Error(message.error));
+      else resolve(message);
+      return;
+    }
 
-  if (message.type === "ready") {
-    state.ready = true;
-    els.engine.textContent = message.wasm ? "Rust/WASM scanner active" : "JS scanner fallback active";
-  }
+    if (message.type === "ready") {
+      state.ready = true;
+      els.engine.textContent = message.wasm
+        ? "Rust/WASM scanner active"
+        : "JS scanner fallback active";
+    }
 
-  if (message.type === "progress") {
-    els.status.textContent = `Indexing ${formatNumber(message.lines)} rows · ${formatBytes(message.bytes)} scanned`;
-    els.rowCount.textContent = formatNumber(message.lines);
-  }
+    if (message.type === "progress") {
+      els.status.textContent = `Indexing ${formatNumber(message.lines)} rows · ${formatBytes(message.bytes)} scanned`;
+      els.rowCount.textContent = formatNumber(message.lines);
+    }
 
-  if (message.type === "search-progress") {
-    els.status.textContent = `Searching line ${formatNumber(message.line)} · ${formatNumber(message.matches)} matches`;
-  }
-};
+    if (message.type === "search-progress") {
+      els.status.textContent = `Searching line ${formatNumber(message.line)} · ${formatNumber(message.matches)} matches`;
+    }
+  };
 
-if (worker) worker.onerror = (event) => {
-  const message = event.message || "The worker crashed while processing the file.";
-  rejectPending(message);
-  showFatal(message);
-};
+if (worker)
+  worker.onerror = (event) => {
+    const message = event.message || "The worker crashed while processing the file.";
+    rejectPending(message);
+    showFatal(message);
+  };
 
-if (worker) worker.onmessageerror = () => {
-  const message = "The browser could not pass data to the worker.";
-  rejectPending(message);
-  showFatal(message);
-};
+if (worker)
+  worker.onmessageerror = () => {
+    const message = "The browser could not pass data to the worker.";
+    rejectPending(message);
+    showFatal(message);
+  };
 
 function showFatal(message) {
   els.engine.textContent = "Worker blocked";
@@ -142,11 +147,6 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
-}
-
-function shortText(value, max = 180) {
-  const text = String(value ?? "").replace(/\s+/g, " ").trim();
-  return text.length > max ? `${text.slice(0, max - 1)}...` : text;
 }
 
 async function openFile(file) {
@@ -234,21 +234,26 @@ async function renderRows() {
   }
 
   els.rows.style.transform = `translateY(${start * ROW_HEIGHT}px)`;
-  els.rows.innerHTML = displayIndexes.map((displayIndex) => {
-    const line = sourceLineAt(displayIndex);
-    const row = state.rows.get(line);
-    const active = line === state.selected ? " active" : "";
-    const chips = row?.chips || [];
-    return `
+  els.rows.innerHTML = displayIndexes
+    .map((displayIndex) => {
+      const line = sourceLineAt(displayIndex);
+      const row = state.rows.get(line);
+      const active = line === state.selected ? " active" : "";
+      const chips = row?.chips || [];
+      return `
       <button class="row${active}" style="top:${(displayIndex - start) * ROW_HEIGHT}px" data-line="${line}">
         <span class="row-index">#${line + 1}</span>
         <span>
           <span class="row-title">${escapeHtml(row?.title || "Loading row")}</span>
-          <span class="chips">${chips.slice(0, 5).map((chip) => `<span class="chip">${escapeHtml(chip)}</span>`).join("")}</span>
+          <span class="chips">${chips
+            .slice(0, 5)
+            .map((chip) => `<span class="chip">${escapeHtml(chip)}</span>`)
+            .join("")}</span>
         </span>
       </button>
     `;
-  }).join("");
+    })
+    .join("");
 }
 
 function scheduleRenderRows() {
@@ -321,12 +326,16 @@ function renderDetail(row) {
 function renderSummary(row) {
   const json = row.json || {};
   const prompt = Array.isArray(json.prompt) ? json.prompt : [];
-  const promptHtml = prompt.map((msg) => `
+  const promptHtml = prompt
+    .map(
+      (msg) => `
     <div class="card">
       <div class="role">${escapeHtml(msg.role || "message")}</div>
       <div class="text">${escapeHtml(msg.content || "")}</div>
     </div>
-  `).join("");
+  `
+    )
+    .join("");
   const ideal = json.ideal_completions_data?.ideal_completion || "";
   const rubrics = Array.isArray(json.rubrics) ? json.rubrics : [];
 
@@ -352,13 +361,17 @@ function renderRubrics(rubrics) {
     <table>
       <thead><tr><th>Points</th><th>Criterion</th><th>Tags</th></tr></thead>
       <tbody>
-        ${rubrics.map((rubric) => `
+        ${rubrics
+          .map(
+            (rubric) => `
           <tr>
             <td>${escapeHtml(rubric.points ?? "")}</td>
             <td>${escapeHtml(rubric.criterion || "")}</td>
             <td>${escapeHtml((rubric.tags || []).join(", "))}</td>
           </tr>
-        `).join("")}
+        `
+          )
+          .join("")}
       </tbody>
     </table>
   `;

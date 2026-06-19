@@ -6,9 +6,20 @@
   "scripts": {
     "build:wasm": "node scripts/cargo.mjs build --release --target wasm32-unknown-unknown",
     "check:wasm": "node scripts/cargo.mjs check --target wasm32-unknown-unknown",
+    "format": "prettier --write . && node scripts/cargo.mjs fmt",
+    "format:check": "prettier --check . && node scripts/cargo.mjs fmt -- --check",
+    "lint": "npm run lint:js && npm run lint:rust",
+    "lint:js": "eslint .",
+    "lint:rust": "node scripts/cargo.mjs clippy --target wasm32-unknown-unknown -- -D warnings",
     "serve": "python3 -m http.server 8765",
     "dev": "npm run build:wasm && npm run serve",
     "generate": "node scripts/generate-synthetic-jsonl.mjs",
     "generate:1m": "node scripts/generate-synthetic-jsonl.mjs 1000000 sample/1m_test.jsonl"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.5.0",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.4"
   }
 }

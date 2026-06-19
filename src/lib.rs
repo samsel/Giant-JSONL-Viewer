@@ -9,6 +9,10 @@ pub extern "C" fn alloc_u8(len: usize) -> *mut u8 {
 }
 
 #[no_mangle]
+/// # Safety
+///
+/// `ptr` must have been returned by `alloc_u8` with the same `len`, and it must
+/// not be used again after this call.
 pub unsafe extern "C" fn dealloc_u8(ptr: *mut u8, len: usize) {
     if !ptr.is_null() {
         drop(Vec::from_raw_parts(ptr, 0, len));
@@ -24,6 +28,10 @@ pub extern "C" fn alloc_u32(len: usize) -> *mut u32 {
 }
 
 #[no_mangle]
+/// # Safety
+///
+/// `ptr` must have been returned by `alloc_u32` with the same `len`, and it must
+/// not be used again after this call.
 pub unsafe extern "C" fn dealloc_u32(ptr: *mut u32, len: usize) {
     if !ptr.is_null() {
         drop(Vec::from_raw_parts(ptr, 0, len));
@@ -31,6 +39,11 @@ pub unsafe extern "C" fn dealloc_u32(ptr: *mut u32, len: usize) {
 }
 
 #[no_mangle]
+/// # Safety
+///
+/// `input_ptr` must point to `input_len` readable bytes. `output_ptr` must point
+/// to `output_capacity` writable `u32` slots. Both memory regions must be valid
+/// for the duration of the call.
 pub unsafe extern "C" fn scan_newlines(
     input_ptr: *const u8,
     input_len: usize,

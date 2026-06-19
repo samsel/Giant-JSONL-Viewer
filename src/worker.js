@@ -1,5 +1,4 @@
 const CHUNK_SIZE = 8 * 1024 * 1024;
-const decoder = new TextDecoder();
 
 let wasm = null;
 let wasmReady = false;
@@ -11,7 +10,10 @@ let wasmInit = null;
 
 async function initWasm() {
   try {
-    const module = await WebAssembly.instantiateStreaming(fetch("../target/wasm32-unknown-unknown/release/jsonl_wasm.wasm"), {});
+    const module = await WebAssembly.instantiateStreaming(
+      fetch("../target/wasm32-unknown-unknown/release/jsonl_wasm.wasm"),
+      {}
+    );
     wasm = module.instance;
     wasmReady = true;
     postMessage({ type: "ready", wasm: true });
@@ -40,7 +42,11 @@ function scanNewlinesWasm(bytes) {
   const memory = new Uint8Array(exports.memory.buffer);
   memory.set(bytes, inputPtr);
   const count = exports.scan_newlines(inputPtr, bytes.length, outputPtr, bytes.length);
-  const positions = new Uint32Array(exports.memory.buffer, outputPtr, Math.min(count, bytes.length)).slice();
+  const positions = new Uint32Array(
+    exports.memory.buffer,
+    outputPtr,
+    Math.min(count, bytes.length)
+  ).slice();
   exports.dealloc_u8(inputPtr, bytes.length);
   exports.dealloc_u32(outputPtr, bytes.length);
   return positions;
@@ -105,7 +111,9 @@ function summarize(index, raw, bytes, includeJson = false) {
       : "";
     const tags = [
       ...(Array.isArray(json.example_tags) ? json.example_tags : []),
-      ...(Array.isArray(json.rubrics) ? json.rubrics.flatMap((rubric) => Array.isArray(rubric.tags) ? rubric.tags : []) : []),
+      ...(Array.isArray(json.rubrics)
+        ? json.rubrics.flatMap((rubric) => (Array.isArray(rubric.tags) ? rubric.tags : []))
+        : []),
     ];
     const group = json.ideal_completions_data?.ideal_completions_group;
     const title = prompt || raw;
@@ -133,7 +141,9 @@ function summarize(index, raw, bytes, includeJson = false) {
 }
 
 function shortText(value, max) {
-  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  const text = String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
   return text.length > max ? `${text.slice(0, max - 1)}...` : text;
 }
 
