@@ -4,6 +4,7 @@
 /target/
 
 # Local JSONL datasets and generated stress files
+/sample/
 *.jsonl
 !examples/*.jsonl
 *.jsonl.tmp

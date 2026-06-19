@@ -90,6 +90,7 @@ function rowFor(i) {
 
 async function generate() {
   const tmp = `${output}.tmp`;
+  fs.mkdirSync(path.dirname(output), { recursive: true });
   if (fs.existsSync(tmp)) fs.rmSync(tmp);
 
   const stream = fs.createWriteStream(tmp, { flags: "w", highWaterMark: 16 * 1024 * 1024 });

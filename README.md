@@ -93,10 +93,10 @@ npm run generate:1m
 Or choose a custom size and path:
 
 ```sh
-npm run generate -- 1000000 1m_test.jsonl
+npm run generate -- 1000000 sample/1m_test.jsonl
 ```
 
-The generated `1m_test.jsonl` is several GB. It is meant for local stress testing, not for committing to GitHub.
+The generated `sample/1m_test.jsonl` is several GB. The entire `sample/` directory is ignored by git and is meant for local stress testing, not for committing to GitHub.
 
 ## Project Layout
 
@@ -155,6 +155,7 @@ The workflow builds the Rust/WASM artifact and deploys the static app.
 ## Notes
 
 - `target/` is ignored because it is a Rust build artifact.
+- `sample/` is ignored because it is for local datasets and stress-test files.
 - `*.jsonl` is ignored by default so large local datasets are not accidentally committed.
 - `examples/*.jsonl` is explicitly allowed so small demo data can be versioned.
 
