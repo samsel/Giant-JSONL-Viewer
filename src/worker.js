@@ -11,7 +11,7 @@ let wasmInit = null;
 async function initWasm() {
   try {
     const module = await WebAssembly.instantiateStreaming(
-      fetch("../target/wasm32-unknown-unknown/release/jsonl_wasm.wasm"),
+      fetch("../target/wasm32-unknown-unknown/release/giant_jsonl_viewer.wasm"),
       {}
     );
     wasm = module.instance;

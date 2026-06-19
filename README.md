@@ -1,6 +1,6 @@
-# Forge JSONL
+# Giant JSONL Viewer
 
-Forge JSONL is a browser-only JSONL viewer built for large files. It uses a Rust/WASM scanner inside a Web Worker to build a byte-offset line index, then lazily slices and parses only the rows the UI needs.
+Giant JSONL Viewer is a browser-only JSONL viewer built for large files. It uses a Rust/WASM scanner inside a Web Worker to build a byte-offset line index, then lazily slices and parses only the rows the UI needs.
 
 It is designed for logs, evaluation datasets, model traces, and other newline-delimited JSON files that are too large for ordinary JSON viewers.
 
@@ -137,14 +137,14 @@ Recommended first commit:
 ```sh
 git init
 git add .gitignore Cargo.lock Cargo.toml LICENSE README.md index.html package.json styles.css examples scripts src
-git commit -m "Initial Forge JSONL viewer"
+git commit -m "Initial Giant JSONL Viewer"
 ```
 
 Then create an empty repository on GitHub and push:
 
 ```sh
 git branch -M main
-git remote add origin git@github.com:YOUR_USERNAME/forge-jsonl.git
+git remote add origin git@github.com:YOUR_USERNAME/giant-jsonl-viewer.git
 git push -u origin main
 ```
 

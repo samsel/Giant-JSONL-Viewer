@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Forge JSONL</title>
+    <title>Giant JSONL Viewer</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <script>
       if (location.protocol === "file:") {
         document.body.innerHTML =
-          '<div style="min-height:100vh;display:grid;place-items:center;background:#0d0e0b;color:#f4f1df;font:16px Avenir Next,Gill Sans,Trebuchet MS,sans-serif;text-align:center;padding:24px"><div><h1 style="margin:0 0 12px">Forge JSONL needs localhost</h1><p style="color:#a7a18e;max-width:560px">Chrome blocks this app&apos;s Web Worker and WASM module from file:// URLs. Redirecting to the local server now.</p><p><a style="color:#e9ca54" href="http://localhost:8765/index.html">Open http://localhost:8765/index.html</a></p></div></div>';
+          '<div style="min-height:100vh;display:grid;place-items:center;background:#0d0e0b;color:#f4f1df;font:16px Avenir Next,Gill Sans,Trebuchet MS,sans-serif;text-align:center;padding:24px"><div><h1 style="margin:0 0 12px">Giant JSONL Viewer needs localhost</h1><p style="color:#a7a18e;max-width:560px">Chrome blocks this app&apos;s Web Worker and WASM module from file:// URLs. Redirecting to the local server now.</p><p><a style="color:#e9ca54" href="http://localhost:8765/index.html">Open http://localhost:8765/index.html</a></p></div></div>';
         setTimeout(() => location.replace("http://localhost:8765/index.html"), 500);
       }
     </script>
@@ -19,7 +19,7 @@
         <div class="brand">
           <span class="mark">{}</span>
           <div>
-            <strong>Forge JSONL</strong>
+            <strong>Giant JSONL Viewer</strong>
             <small id="engine">WASM worker warming up</small>
           </div>
         </div>

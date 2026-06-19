@@ -1,5 +1,5 @@
 [package]
-name = "jsonl_wasm"
+name = "giant_jsonl_viewer"
 version = "0.1.0"
 edition = "2021"
 
