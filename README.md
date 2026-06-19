@@ -4,6 +4,12 @@ Giant JSONL Viewer is a browser-only JSONL viewer built for large files. It uses
 
 It is designed for logs, evaluation datasets, model traces, and other newline-delimited JSON files that are too large for ordinary JSON viewers.
 
+## Screenshots
+
+![Giant JSONL Viewer showing light mode search results and summary inspector](docs/screenshots/light-search-summary.png)
+
+![Giant JSONL Viewer showing dark mode raw JSON inspection](docs/screenshots/dark-raw-view.png)
+
 ## Features
 
 - Rust/WASM newline scanner compiled to `wasm32-unknown-unknown`
