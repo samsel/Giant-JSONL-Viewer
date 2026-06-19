@@ -1,84 +1,136 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Giant JSONL Viewer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <script>
       if (location.protocol === "file:") {
         document.body.innerHTML =
-          '<div style="min-height:100vh;display:grid;place-items:center;background:#0d0e0b;color:#f4f1df;font:16px Avenir Next,Gill Sans,Trebuchet MS,sans-serif;text-align:center;padding:24px"><div><h1 style="margin:0 0 12px">Giant JSONL Viewer needs localhost</h1><p style="color:#a7a18e;max-width:560px">Chrome blocks this app&apos;s Web Worker and WASM module from file:// URLs. Redirecting to the local server now.</p><p><a style="color:#e9ca54" href="http://localhost:8765/index.html">Open http://localhost:8765/index.html</a></p></div></div>';
+          '<div style="min-height:100vh;display:grid;place-items:center;background:#f4f2ec;color:#1d1b17;font:16px IBM Plex Sans,Avenir Next,Gill Sans,sans-serif;text-align:center;padding:24px"><div><h1 style="margin:0 0 12px">Giant JSONL Viewer needs localhost</h1><p style="color:#88847a;max-width:560px">Chrome blocks this app&apos;s Web Worker and WASM module from file:// URLs. Redirecting to the local server now.</p><p><a style="color:#b85c38" href="http://localhost:8765/index.html">Open http://localhost:8765/index.html</a></p></div></div>';
         setTimeout(() => location.replace("http://localhost:8765/index.html"), 500);
       }
     </script>
-    <div class="app">
+
+    <div class="app-shell">
       <header class="topbar">
         <div class="brand">
-          <span class="mark">{}</span>
-          <div>
+          <svg class="brand-mark" width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
+            <rect x="3" y="4" width="24" height="22" />
+            <rect class="brand-line-accent" x="7" y="9" width="13" height="2.4" />
+            <rect class="brand-line-strong" x="7" y="13.8" width="16" height="2.4" />
+            <rect class="brand-line-faint" x="7" y="18.6" width="9" height="2.4" />
+          </svg>
+          <div class="brand-copy">
             <strong>Giant JSONL Viewer</strong>
-            <small id="engine">WASM worker warming up</small>
+            <span><i></i><span id="engine">WASM worker warming up</span></span>
           </div>
         </div>
 
-        <div class="controls">
-          <label class="file-button">
+        <div class="top-divider"></div>
+
+        <div class="file-meta">
+          <span id="currentFileName" class="file-name">No file loaded</span>
+          <span id="statFileSize" class="stat-chip">0 MB</span>
+          <span id="statRows" class="stat-chip">0 rows</span>
+          <span id="statIndexTime" class="stat-chip">indexed 0 ms</span>
+        </div>
+
+        <div class="top-actions">
+          <label class="button button-primary">
             <input id="fileInput" type="file" accept=".jsonl,.json,.txt,application/json" />
-            <span>Open</span>
+            <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true">
+              <rect x="6" y="1" width="2" height="12"></rect>
+              <rect x="1" y="6" width="12" height="2"></rect>
+            </svg>
+            <span>Open file</span>
           </label>
-          <button id="loadSample" type="button">Load Sample</button>
-          <button id="cancelSearch" type="button" hidden>Stop Search</button>
+          <button id="loadSample" class="button button-secondary" type="button">Load sample</button>
+          <button id="themeToggle" class="button button-secondary theme-toggle" type="button">
+            Dark mode
+          </button>
         </div>
       </header>
 
-      <section class="hero">
-        <div>
-          <p class="kicker">Rust/WASM offset index, lazy rows, browser-only</p>
-          <h1 id="headline">Inspect JSONL without turning it into a memory bonfire.</h1>
-        </div>
-        <div class="metrics">
-          <div><span id="fileSize">0 MB</span><small>file size</small></div>
-          <div><span id="rowCount">0</span><small>rows indexed</small></div>
-          <div><span id="indexTime">0 ms</span><small>index time</small></div>
-        </div>
-      </section>
-
       <main class="workspace">
-        <aside class="rail">
-          <div class="searchbar">
-            <input id="searchInput" type="search" placeholder="Stream search text, tags, rubrics" />
-            <button id="searchButton" type="button">Search</button>
+        <aside class="row-index">
+          <div class="search-panel">
+            <div class="search-wrap">
+              <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="7" cy="7" r="4.6"></circle>
+                <line x1="10.6" y1="10.6" x2="14" y2="14"></line>
+              </svg>
+              <input
+                id="searchInput"
+                type="search"
+                autocomplete="off"
+                placeholder="Search prompts, rubrics, tags, raw text..."
+              />
+              <button id="clearSearch" type="button" aria-label="Clear search" hidden>×</button>
+            </div>
+
+            <div id="density" class="density" hidden>
+              <div id="densityBars" class="density-bars"></div>
+              <div class="density-labels">
+                <span>line 1</span>
+                <span>match distribution</span>
+                <span id="densityEnd">line 0</span>
+              </div>
+            </div>
+
+            <div id="status" class="status-line">Open a JSONL file or load the sample.</div>
           </div>
-          <div id="status" class="status">Open a JSONL file or load the local sample.</div>
-          <div class="jump">
-            <label for="jumpInput">Jump to line</label>
-            <input id="jumpInput" type="number" min="1" value="1" />
-          </div>
-          <div id="list" class="list" aria-label="JSONL rows">
+
+          <div id="list" class="list" tabindex="0" aria-label="JSONL rows">
             <div id="spacer" class="spacer"></div>
             <div id="rows" class="rows"></div>
+          </div>
+
+          <div class="jump-footer">
+            <label for="jumpInput">Jump to</label>
+            <input id="jumpInput" type="number" min="1" value="1" />
+            <span class="footer-spacer"></span>
+            <span class="key-hint">↑ ↓ / j k to navigate</span>
           </div>
         </aside>
 
         <section class="inspector">
-          <div class="inspector-head">
-            <div>
-              <span id="lineLabel" class="line-label">No row selected</span>
-              <h2 id="rowTitle">Open a file to begin</h2>
+          <div id="inspectorHeader" class="inspector-header">
+            <div class="title-block">
+              <div class="line-row">
+                <span id="lineLabel" class="line-label">No row selected</span>
+                <span id="domainLabel" class="domain-chip">dataset</span>
+              </div>
+              <h2 id="rowTitle">Open a JSONL file or load the sample</h2>
             </div>
-            <div class="tabs" role="tablist">
-              <button class="active" data-tab="summary" type="button">Summary</button>
-              <button data-tab="tree" type="button">Tree</button>
-              <button data-tab="raw" type="button">Raw</button>
+            <div class="inspector-actions">
+              <div class="nav-buttons">
+                <button id="prevRow" type="button" aria-label="Previous row">‹</button>
+                <button id="nextRow" type="button" aria-label="Next row">›</button>
+              </div>
+              <div class="tabs" role="tablist" aria-label="Inspector view">
+                <button class="active" data-tab="summary" type="button">Summary</button>
+                <button data-tab="tree" type="button">Tree</button>
+                <button data-tab="raw" type="button">Raw</button>
+              </div>
             </div>
           </div>
+
           <div id="detail" class="detail">
-            <div class="empty">
-              This build indexes line starts first. Row JSON is parsed only when you select or
-              render it.
+            <div class="empty-state">
+              <strong>No row selected</strong>
+              <span>
+                Rows are indexed by byte offset and parsed lazily. Only what you view is decoded.
+              </span>
             </div>
           </div>
         </section>

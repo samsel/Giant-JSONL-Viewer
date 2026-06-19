@@ -12,6 +12,7 @@ It is designed for logs, evaluation datasets, model traces, and other newline-de
 - Lazy row parsing: JSON is parsed when a row is visible or selected
 - Summary, tree, and raw views
 - Streaming text search with cancel support
+- Light and dark themes
 - Empty file, invalid row, blocked worker, and no-match states
 - No backend and no upload: files stay in your browser
 

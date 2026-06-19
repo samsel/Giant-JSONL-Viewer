@@ -1,5 +1,7 @@
-const ROW_HEIGHT = 84;
-const OVERSCAN = 8;
+const ROW_HEIGHT = 76;
+const OVERSCAN = 6;
+const DENSITY_BUCKETS = 44;
+const SEARCH_LIMIT = 4000;
 const SAMPLE_FILE = "./examples/sample.jsonl";
 const SAMPLE_NAME = "sample.jsonl";
 
@@ -9,36 +11,50 @@ const state = {
   selected: -1,
   rows: new Map(),
   tab: "summary",
-  searchResults: null,
-  fileName: "",
+  matches: null,
+  query: "",
+  fileName: "No file loaded",
+  fileSize: 0,
+  indexTime: 0,
 };
 
 let worker = null;
-const pending = new Map();
 let requestId = 0;
 let renderScheduled = false;
+let searchTimer = 0;
+let searchToken = 0;
+
+const pending = new Map();
 
 const els = {
   engine: document.getElementById("engine"),
   fileInput: document.getElementById("fileInput"),
   loadSample: document.getElementById("loadSample"),
-  cancelSearch: document.getElementById("cancelSearch"),
-  headline: document.getElementById("headline"),
-  fileSize: document.getElementById("fileSize"),
-  rowCount: document.getElementById("rowCount"),
-  indexTime: document.getElementById("indexTime"),
+  themeToggle: document.getElementById("themeToggle"),
+  currentFileName: document.getElementById("currentFileName"),
+  statFileSize: document.getElementById("statFileSize"),
+  statRows: document.getElementById("statRows"),
+  statIndexTime: document.getElementById("statIndexTime"),
   searchInput: document.getElementById("searchInput"),
-  searchButton: document.getElementById("searchButton"),
+  clearSearch: document.getElementById("clearSearch"),
+  density: document.getElementById("density"),
+  densityBars: document.getElementById("densityBars"),
+  densityEnd: document.getElementById("densityEnd"),
   status: document.getElementById("status"),
-  jumpInput: document.getElementById("jumpInput"),
   list: document.getElementById("list"),
   spacer: document.getElementById("spacer"),
   rows: document.getElementById("rows"),
+  jumpInput: document.getElementById("jumpInput"),
   lineLabel: document.getElementById("lineLabel"),
+  domainLabel: document.getElementById("domainLabel"),
   rowTitle: document.getElementById("rowTitle"),
-  detail: document.getElementById("detail"),
+  prevRow: document.getElementById("prevRow"),
+  nextRow: document.getElementById("nextRow"),
   tabs: document.querySelector(".tabs"),
+  detail: document.getElementById("detail"),
 };
+
+initTheme();
 
 try {
   worker = new Worker("./src/worker.js", { type: "module" });
@@ -52,6 +68,7 @@ function callWorker(type, payload = {}, transfer) {
   if (!worker) {
     return Promise.reject(new Error("Worker unavailable. Open http://localhost:8765/index.html."));
   }
+
   const id = ++requestId;
   worker.postMessage({ id, type, ...payload }, transfer || []);
   return new Promise((resolve, reject) => {
@@ -59,7 +76,7 @@ function callWorker(type, payload = {}, transfer) {
   });
 }
 
-if (worker)
+if (worker) {
   worker.onmessage = (event) => {
     const message = event.data;
     if (message.id && pending.has(message.id)) {
@@ -78,36 +95,44 @@ if (worker)
     }
 
     if (message.type === "progress") {
-      els.status.textContent = `Indexing ${formatNumber(message.lines)} rows · ${formatBytes(message.bytes)} scanned`;
-      els.rowCount.textContent = formatNumber(message.lines);
+      setStatus(
+        `Indexing ${formatNumber(message.lines)} rows · ${formatBytes(message.bytes)} scanned`
+      );
+      els.statRows.textContent = `${formatNumber(message.lines)} rows`;
     }
 
     if (message.type === "search-progress") {
-      els.status.textContent = `Searching line ${formatNumber(message.line)} · ${formatNumber(message.matches)} matches`;
+      setStatus(
+        `Searching line ${formatNumber(message.line)} · ${formatNumber(message.matches)} matches`
+      );
     }
   };
 
-if (worker)
   worker.onerror = (event) => {
     const message = event.message || "The worker crashed while processing the file.";
     rejectPending(message);
     showFatal(message);
   };
 
-if (worker)
   worker.onmessageerror = () => {
     const message = "The browser could not pass data to the worker.";
     rejectPending(message);
     showFatal(message);
   };
+}
 
-function showFatal(message) {
-  els.engine.textContent = "Worker blocked";
-  els.status.textContent = message;
-  els.rowTitle.textContent = "Cannot start worker";
-  els.detail.innerHTML = `<div class="error">${escapeHtml(message)}</div>`;
-  els.loadSample.disabled = true;
-  els.searchButton.disabled = true;
+function initTheme() {
+  const saved = localStorage.getItem("giant-jsonl-theme");
+  const preferred =
+    saved || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  setTheme(preferred);
+}
+
+function setTheme(theme) {
+  const next = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem("giant-jsonl-theme", next);
+  els.themeToggle.textContent = next === "dark" ? "Light mode" : "Dark mode";
 }
 
 function rejectPending(message) {
@@ -117,15 +142,36 @@ function rejectPending(message) {
   pending.clear();
 }
 
+function showFatal(message) {
+  els.engine.textContent = "Worker blocked";
+  setStatus(message);
+  els.rowTitle.textContent = "Cannot start worker";
+  els.detail.innerHTML = `<div class="error-state"><span>${escapeHtml(message)}</span></div>`;
+  els.fileInput.disabled = true;
+  els.loadSample.disabled = true;
+}
+
+function setStatus(message) {
+  els.status.textContent = message;
+}
+
 function setBusy(isBusy, message) {
   els.fileInput.disabled = isBusy;
   els.loadSample.disabled = isBusy;
-  els.searchButton.disabled = isBusy || !state.rowCount;
-  if (message) els.status.textContent = message;
+  if (message) setStatus(message);
+}
+
+function updateMeta() {
+  els.currentFileName.textContent = state.fileName;
+  els.statFileSize.textContent = formatBytes(state.fileSize);
+  els.statRows.textContent = `${formatNumber(state.rowCount)} rows`;
+  els.statIndexTime.textContent = `indexed ${Math.round(state.indexTime)} ms`;
+  els.densityEnd.textContent = `line ${formatNumber(state.rowCount)}`;
+  els.jumpInput.max = String(state.rowCount || 1);
 }
 
 function formatBytes(bytes) {
-  if (!bytes) return "0 MB";
+  if (!bytes) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
   let value = bytes;
   let unit = 0;
@@ -149,37 +195,54 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function highlighted(value) {
+  const safe = escapeHtml(value);
+  if (!state.query) return safe;
+  return safe.replace(new RegExp(escapeRegExp(escapeHtml(state.query)), "ig"), (match) => {
+    return `<mark>${match}</mark>`;
+  });
+}
+
 async function openFile(file) {
+  searchToken++;
+  if (worker) worker.postMessage({ type: "cancel-search" });
   setBusy(true, "Starting byte-offset index");
   state.rows.clear();
   state.rowCount = 0;
   state.selected = -1;
-  state.searchResults = null;
+  state.matches = null;
+  state.query = "";
   state.fileName = file.name;
-  els.headline.textContent = file.name;
-  els.fileSize.textContent = formatBytes(file.size);
-  els.rowCount.textContent = "0";
-  els.indexTime.textContent = "0 ms";
-  els.detail.innerHTML = '<div class="empty">Indexing line starts in a worker.</div>';
-  els.rowTitle.textContent = "Indexing";
-  els.lineLabel.textContent = "No row selected";
+  state.fileSize = file.size;
+  state.indexTime = 0;
+  els.searchInput.value = "";
+  els.clearSearch.hidden = true;
+  els.density.hidden = true;
   els.spacer.style.height = "0px";
   els.rows.innerHTML = "";
+  updateMeta();
+  renderEmpty("Indexing file", "Line starts are being indexed in a worker.");
 
   try {
     const result = await callWorker("open-file", { file });
     state.rowCount = result.rowCount;
-    els.rowCount.textContent = formatNumber(result.rowCount);
-    els.indexTime.textContent = `${Math.round(result.elapsed)} ms`;
-    els.status.textContent = `Indexed ${formatNumber(result.rowCount)} rows using ${result.engine}.`;
+    state.indexTime = result.elapsed;
+    updateMeta();
+    setStatus(
+      `${formatNumber(result.rowCount)} rows · indexed in ${Math.round(result.elapsed)} ms`
+    );
     els.spacer.style.height = `${result.rowCount * ROW_HEIGHT}px`;
-    els.jumpInput.max = String(result.rowCount || 1);
 
     if (result.rowCount) {
       await selectLine(0, true);
     } else {
-      showEmptyFile();
+      renderEmpty("Empty file", "This file has no JSONL rows.");
     }
+
     scheduleRenderRows();
   } finally {
     setBusy(false);
@@ -190,19 +253,26 @@ async function loadSample() {
   const response = await fetch(SAMPLE_FILE, { cache: "no-store" });
   if (!response.ok) throw new Error(`Could not fetch sample: ${response.status}`);
   const blob = await response.blob();
-  const file = new File([blob], SAMPLE_NAME, { type: "application/jsonl" });
-  await openFile(file);
+  await openFile(new File([blob], SAMPLE_NAME, { type: "application/jsonl" }));
 }
 
-function visibleRange() {
-  const total = state.searchResults ? state.searchResults.length : state.rowCount;
-  const start = Math.max(0, Math.floor(els.list.scrollTop / ROW_HEIGHT) - OVERSCAN);
-  const visible = Math.ceil(els.list.clientHeight / ROW_HEIGHT) + OVERSCAN * 2;
-  return { start, count: Math.min(visible, Math.max(0, total - start)), total };
+function visibleTotal() {
+  return state.matches ? state.matches.list.length : state.rowCount;
 }
 
 function sourceLineAt(displayIndex) {
-  return state.searchResults ? state.searchResults[displayIndex] : displayIndex;
+  return state.matches ? state.matches.list[displayIndex] : displayIndex;
+}
+
+function displayIndexForLine(line) {
+  return state.matches ? state.matches.list.indexOf(line) : line;
+}
+
+function visibleRange() {
+  const total = visibleTotal();
+  const start = Math.max(0, Math.floor(els.list.scrollTop / ROW_HEIGHT) - OVERSCAN);
+  const visible = Math.ceil(els.list.clientHeight / ROW_HEIGHT) + OVERSCAN * 2;
+  return { start, count: Math.min(visible, Math.max(0, total - start)), total };
 }
 
 async function renderRows() {
@@ -211,7 +281,7 @@ async function renderRows() {
   els.spacer.style.height = `${total * ROW_HEIGHT}px`;
 
   if (!count) {
-    els.rows.innerHTML = '<div class="empty">No rows</div>';
+    els.rows.innerHTML = "";
     return;
   }
 
@@ -227,8 +297,8 @@ async function renderRows() {
         state.rows.set(row.index, { ...(state.rows.get(row.index) || {}), ...row });
       }
     } catch (error) {
-      els.status.textContent = `Could not load visible rows: ${error.message}`;
-      els.rows.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+      setStatus(`Could not load visible rows: ${error.message}`);
+      els.rows.innerHTML = "";
       return;
     }
   }
@@ -239,19 +309,24 @@ async function renderRows() {
       const line = sourceLineAt(displayIndex);
       const row = state.rows.get(line);
       const active = line === state.selected ? " active" : "";
+      const title = row?.title || "Loading row";
+      const bytes = row?.bytes ? formatBytes(row.bytes) : "";
       const chips = row?.chips || [];
       return `
-      <button class="row${active}" style="top:${(displayIndex - start) * ROW_HEIGHT}px" data-line="${line}">
-        <span class="row-index">#${line + 1}</span>
-        <span>
-          <span class="row-title">${escapeHtml(row?.title || "Loading row")}</span>
-          <span class="chips">${chips
-            .slice(0, 5)
-            .map((chip) => `<span class="chip">${escapeHtml(chip)}</span>`)
-            .join("")}</span>
-        </span>
-      </button>
-    `;
+        <div class="row${active}" role="button" tabindex="-1" style="top:${(displayIndex - start) * ROW_HEIGHT}px" data-line="${line}">
+          <span class="row-index-label">
+            <strong>#${formatNumber(line + 1)}</strong>
+            <small>${escapeHtml(bytes)}</small>
+          </span>
+          <span class="row-main">
+            <span class="row-title">${highlighted(title)}</span>
+            <span class="chips">${chips
+              .slice(0, 5)
+              .map((chip) => `<span class="chip">${escapeHtml(chip)}</span>`)
+              .join("")}</span>
+          </span>
+        </div>
+      `;
     })
     .join("");
 }
@@ -268,7 +343,7 @@ async function selectLine(line, scrollIntoView = false) {
   els.jumpInput.value = String(line + 1);
 
   if (scrollIntoView) {
-    const displayIndex = state.searchResults ? state.searchResults.indexOf(line) : line;
+    const displayIndex = displayIndexForLine(line);
     if (displayIndex >= 0) {
       els.list.scrollTop = Math.max(0, displayIndex * ROW_HEIGHT - ROW_HEIGHT);
     }
@@ -278,8 +353,9 @@ async function selectLine(line, scrollIntoView = false) {
     let row = state.rows.get(line);
     if (!row?.raw) {
       els.lineLabel.textContent = `Line ${formatNumber(line + 1)}`;
+      els.domainLabel.textContent = "loading";
       els.rowTitle.textContent = "Loading row";
-      els.detail.innerHTML = '<div class="empty">Loading selected row.</div>';
+      els.detail.innerHTML = `<div class="empty-state"><strong>Loading row</strong><span>Parsing line ${formatNumber(line + 1)} lazily.</span></div>`;
       const fetched = await callWorker("row-detail", { line });
       row = fetched.row;
       state.rows.set(line, { ...(state.rows.get(line) || {}), ...row });
@@ -288,152 +364,311 @@ async function selectLine(line, scrollIntoView = false) {
     renderDetail(row);
     scheduleRenderRows();
   } catch (error) {
-    els.status.textContent = `Could not load line ${formatNumber(line + 1)}: ${error.message}`;
-    els.detail.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+    setStatus(`Could not load line ${formatNumber(line + 1)}: ${error.message}`);
+    els.detail.innerHTML = `<div class="error-state"><span>${escapeHtml(error.message)}</span></div>`;
   }
 }
 
-function showEmptyFile() {
-  state.selected = -1;
-  els.lineLabel.textContent = "No rows";
-  els.rowTitle.textContent = "Empty file";
-  els.detail.innerHTML = '<div class="empty">This file has no JSONL rows.</div>';
-  els.rows.innerHTML = '<div class="empty">No rows</div>';
-}
-
-function renderDetail(row) {
-  els.lineLabel.textContent = `Line ${formatNumber(row.index + 1)} · ${formatBytes(row.bytes)}`;
-  els.rowTitle.textContent = row.title;
-
-  if (row.error) {
-    els.detail.innerHTML = `<div class="error">${escapeHtml(row.error)}</div><div class="section"><h3>Raw</h3><pre>${escapeHtml(row.raw)}</pre></div>`;
-    return;
-  }
-
-  if (state.tab === "raw") {
-    els.detail.innerHTML = `<pre>${escapeHtml(JSON.stringify(row.json, null, 2))}</pre>`;
-    return;
-  }
-
-  if (state.tab === "tree") {
-    els.detail.innerHTML = `<div class="section"><h3>Tree</h3>${renderTree(row.json)}</div>`;
-    return;
-  }
-
-  els.detail.innerHTML = renderSummary(row);
-}
-
-function renderSummary(row) {
-  const json = row.json || {};
-  const prompt = Array.isArray(json.prompt) ? json.prompt : [];
-  const promptHtml = prompt
-    .map(
-      (msg) => `
-    <div class="card">
-      <div class="role">${escapeHtml(msg.role || "message")}</div>
-      <div class="text">${escapeHtml(msg.content || "")}</div>
-    </div>
-  `
-    )
-    .join("");
-  const ideal = json.ideal_completions_data?.ideal_completion || "";
-  const rubrics = Array.isArray(json.rubrics) ? json.rubrics : [];
-
-  return `
-    <div class="section">
-      <h3>Prompt</h3>
-      ${promptHtml || '<div class="empty">No prompt field found.</div>'}
-    </div>
-    <div class="section">
-      <h3>Ideal completion</h3>
-      <div class="card text">${escapeHtml(ideal || "No ideal completion field found.")}</div>
-    </div>
-    <div class="section">
-      <h3>Rubrics</h3>
-      ${renderRubrics(rubrics)}
+function renderEmpty(title, body) {
+  els.lineLabel.textContent = "No row selected";
+  els.domainLabel.textContent = "dataset";
+  els.rowTitle.textContent = title;
+  els.detail.innerHTML = `
+    <div class="empty-state">
+      <div>
+        <strong>${escapeHtml(title)}</strong>
+        <span>${escapeHtml(body)}</span>
+      </div>
     </div>
   `;
 }
 
-function renderRubrics(rubrics) {
-  if (!rubrics.length) return '<div class="empty">No rubrics.</div>';
+function renderDetail(row) {
+  const json = row.json || {};
+  els.lineLabel.textContent = `Line ${formatNumber(row.index + 1)} · ${formatBytes(row.bytes)}`;
+  els.domainLabel.textContent = domainLabel(json);
+  els.rowTitle.textContent = detailTitle(json, row.title);
+  els.prevRow.disabled = !canNavigate(-1);
+  els.nextRow.disabled = !canNavigate(1);
+
+  if (row.error) {
+    els.detail.innerHTML = `
+      <div class="detail-inner">
+        <div class="error-banner">${escapeHtml(row.error)}</div>
+        <pre class="raw-panel">${escapeHtml(row.raw || "")}</pre>
+      </div>
+    `;
+    return;
+  }
+
+  if (state.tab === "tree") {
+    els.detail.innerHTML = `<div class="detail-inner"><div class="tree-panel">${renderTree(json)}</div></div>`;
+  } else if (state.tab === "raw") {
+    els.detail.innerHTML = `<div class="detail-inner"><pre class="raw-panel">${escapeHtml(JSON.stringify(json, null, 2))}</pre></div>`;
+  } else {
+    els.detail.innerHTML = `<div class="detail-inner">${renderSummary(json)}</div>`;
+  }
+}
+
+function detailTitle(json, fallback) {
+  const prompt = promptMessages(json);
+  const userMessage = prompt.find((msg) => msg.role === "user") || prompt[0];
+  return userMessage?.content || json.title || json.id || fallback || "Selected row";
+}
+
+function domainLabel(json) {
+  if (json.domain) return cleanLabel(json.domain);
+  const tags = [...(json.example_tags || []), ...(json.tags || [])];
+  const theme = tags.find((tag) => String(tag).startsWith("theme:"));
+  if (theme) return cleanLabel(String(theme).replace("theme:", ""));
+  const group = json.ideal_completions_data?.ideal_completions_group;
+  if (group) return cleanLabel(group);
+  return "jsonl";
+}
+
+function cleanLabel(value) {
+  return String(value).replaceAll("_", " ").replaceAll("-", " ").slice(0, 28);
+}
+
+function promptMessages(json) {
+  if (Array.isArray(json.prompt)) return json.prompt;
+  if (Array.isArray(json.messages)) return json.messages;
+  return [];
+}
+
+function idealText(json) {
+  return (
+    json.ideal_completions_data?.ideal_completion ||
+    json.ideal ||
+    json.completion ||
+    json.answer ||
+    ""
+  );
+}
+
+function renderSummary(json) {
+  const messages = promptMessages(json);
+  const ideal = idealText(json);
+  const rubrics = Array.isArray(json.rubrics) ? json.rubrics : [];
+  const generic = !messages.length && !ideal && !rubrics.length;
+
   return `
-    <table>
-      <thead><tr><th>Points</th><th>Criterion</th><th>Tags</th></tr></thead>
-      <tbody>
-        ${rubrics
-          .map(
-            (rubric) => `
-          <tr>
-            <td>${escapeHtml(rubric.points ?? "")}</td>
-            <td>${escapeHtml(rubric.criterion || "")}</td>
-            <td>${escapeHtml((rubric.tags || []).join(", "))}</td>
-          </tr>
-        `
-          )
-          .join("")}
-      </tbody>
-    </table>
+    ${
+      messages.length
+        ? `<section class="section">
+            <h3>Conversation</h3>
+            <div class="message-stack">
+              ${messages.map(renderMessage).join("")}
+            </div>
+          </section>`
+        : ""
+    }
+    ${
+      generic
+        ? `<section class="section">
+            <h3>Fields</h3>
+            <div class="fields-card">${Object.entries(json).map(renderField).join("")}</div>
+          </section>`
+        : ""
+    }
+    ${
+      ideal
+        ? `<section class="section">
+            <h3>Ideal completion</h3>
+            <div class="ideal-card">
+              <div class="ideal-header">★ reference answer</div>
+              <div class="ideal-body">${escapeHtml(ideal)}</div>
+            </div>
+          </section>`
+        : ""
+    }
+    ${
+      rubrics.length
+        ? `<section class="section">
+            <h3>Grading rubrics</h3>
+            <div class="rubric-table">
+              <div class="rubric-head"><span>Points</span><span>Criterion</span><span>Tags</span></div>
+              ${rubrics.map(renderRubric).join("")}
+            </div>
+          </section>`
+        : ""
+    }
+  `;
+}
+
+function renderMessage(message) {
+  const role = String(message.role || "message").toLowerCase();
+  const roleClass = ["system", "user", "assistant"].includes(role) ? role : "other";
+  return `
+    <div class="message-card">
+      <div class="role-header role-${roleClass}">${escapeHtml(role)}</div>
+      <div class="message-body">${escapeHtml(message.content || "")}</div>
+    </div>
+  `;
+}
+
+function renderField([key, value]) {
+  return `
+    <div class="field-row">
+      <span class="field-key">${escapeHtml(key)}</span>
+      <span class="field-value">${escapeHtml(previewValue(value))}</span>
+    </div>
+  `;
+}
+
+function previewValue(value) {
+  if (Array.isArray(value)) return `Array(${value.length})`;
+  if (value && typeof value === "object") return `{ ${Object.keys(value).slice(0, 5).join(", ")} }`;
+  return String(value);
+}
+
+function renderRubric(rubric) {
+  const points = Number(rubric.points || 0);
+  const pointClass = points > 0 ? "pos" : points < 0 ? "neg" : "zero";
+  const pointText = points > 0 ? `+${points}` : String(points);
+  return `
+    <div class="rubric-row">
+      <span class="points ${pointClass}">${escapeHtml(pointText)}</span>
+      <span class="criterion">${escapeHtml(rubric.criterion || "")}</span>
+      <span class="rubric-tags">${escapeHtml((rubric.tags || []).join(" · "))}</span>
+    </div>
   `;
 }
 
 function renderTree(value, key = "root", depth = 0) {
   if (value === null || typeof value !== "object") {
-    return `<div><span class="key">${escapeHtml(key)}</span>: <span class="value">${escapeHtml(JSON.stringify(value))}</span></div>`;
+    return `<div class="leaf ${leafClass(value)}"><span class="tree-key">${escapeHtml(key)}</span>: ${escapeHtml(JSON.stringify(value))}</div>`;
   }
 
   const isArray = Array.isArray(value);
   const entries = Object.entries(value);
-  const label = `${key} ${isArray ? `[${value.length}]` : `{${entries.length}}`}`;
   const open = depth < 2 ? " open" : "";
   return `
     <details${open}>
-      <summary><span class="key">${escapeHtml(label)}</span> <span class="type">${isArray ? "array" : "object"}</span></summary>
+      <summary><span class="tree-key">${escapeHtml(key)} ${isArray ? `[${value.length}]` : `{${entries.length}}`}</span> <span class="tree-type">${isArray ? "array" : "object"}</span></summary>
       ${entries.map(([childKey, childValue]) => renderTree(childValue, childKey, depth + 1)).join("")}
     </details>
   `;
 }
 
+function leafClass(value) {
+  if (value === null) return "null";
+  if (typeof value === "number") return "number";
+  if (typeof value === "boolean") return "boolean";
+  if (typeof value === "string") return "string";
+  return "";
+}
+
+function runSearchDebounced() {
+  window.clearTimeout(searchTimer);
+  searchTimer = window.setTimeout(runSearch, 220);
+}
+
 async function runSearch() {
-  if (!state.rowCount) {
-    els.status.textContent = "Open a JSONL file before searching.";
-    els.detail.innerHTML = '<div class="empty">Open a file to search rows.</div>';
-    return;
-  }
-
   const query = els.searchInput.value.trim();
-  state.searchResults = null;
-  state.rows.clear();
+  state.query = query;
+  els.clearSearch.hidden = !query;
+
+  if (!state.rowCount) {
+    setStatus("Open a JSONL file before searching.");
+    return;
+  }
+
   if (!query) {
-    els.status.textContent = `Showing all ${formatNumber(state.rowCount)} rows.`;
+    searchToken++;
+    if (worker) worker.postMessage({ type: "cancel-search" });
+    state.matches = null;
+    state.rows.clear();
+    els.density.hidden = true;
+    setStatus(
+      `${formatNumber(state.rowCount)} rows · indexed in ${Math.round(state.indexTime)} ms`
+    );
     scheduleRenderRows();
     return;
   }
 
-  els.searchButton.disabled = true;
-  els.cancelSearch.hidden = false;
-  els.status.textContent = "Streaming search through file";
+  const token = ++searchToken;
+  if (worker) worker.postMessage({ type: "cancel-search" });
+  state.matches = { list: [], truncated: false };
+  state.rows.clear();
+  els.list.scrollTop = 0;
+  setStatus(`Searching for "${query}"`);
+  scheduleRenderRows();
+
   try {
-    const result = await callWorker("search", { query, limit: 5000 });
-    state.searchResults = result.matches;
-    els.status.textContent = `Found ${formatNumber(result.matches.length)} matches for "${query}"${result.truncated ? " (limited)" : ""}.`;
-    els.list.scrollTop = 0;
+    const result = await callWorker("search", { query, limit: SEARCH_LIMIT });
+    if (token !== searchToken) return;
+    state.matches = { list: result.matches, truncated: result.truncated };
+    renderDensity(result.matches);
+    setStatus(
+      `${formatNumber(result.matches.length)} matches for "${query}"${
+        result.truncated ? ` · first ${formatNumber(SEARCH_LIMIT)} shown` : ""
+      }`
+    );
     scheduleRenderRows();
+
     if (result.matches.length) {
       await selectLine(result.matches[0], false);
     } else {
       state.selected = -1;
-      els.lineLabel.textContent = "No match selected";
-      els.rowTitle.textContent = "No matches";
-      els.detail.innerHTML = `<div class="empty">No rows matched "${escapeHtml(query)}".</div>`;
+      renderEmpty("No matches", `No rows matched "${query}".`);
     }
   } catch (error) {
-    els.status.textContent = error.message;
-  } finally {
-    els.searchButton.disabled = false;
-    els.cancelSearch.hidden = true;
+    if (token === searchToken && error.message !== "Search cancelled") {
+      setStatus(error.message);
+    }
   }
 }
+
+function renderDensity(matches) {
+  els.density.hidden = !state.query;
+  const buckets = new Array(DENSITY_BUCKETS).fill(0);
+  for (const line of matches) {
+    const bucket = Math.min(
+      DENSITY_BUCKETS - 1,
+      Math.floor((line / Math.max(1, state.rowCount)) * DENSITY_BUCKETS)
+    );
+    buckets[bucket]++;
+  }
+  const max = Math.max(1, ...buckets);
+  els.densityBars.innerHTML = buckets
+    .map((count) => {
+      if (!count) return '<div class="density-bar empty"></div>';
+      const height = Math.max(3, Math.round((count / max) * 30));
+      return `<div class="density-bar" style="height:${height}px"></div>`;
+    })
+    .join("");
+}
+
+function clearSearch() {
+  els.searchInput.value = "";
+  runSearch();
+}
+
+function canNavigate(direction) {
+  const total = visibleTotal();
+  if (!total || state.selected < 0) return false;
+  const displayIndex = displayIndexForLine(state.selected);
+  return displayIndex + direction >= 0 && displayIndex + direction < total;
+}
+
+function navigate(direction) {
+  const total = visibleTotal();
+  if (!total) return;
+  const current = state.selected < 0 ? -1 : displayIndexForLine(state.selected);
+  const nextDisplay = Math.max(0, Math.min(total - 1, current + direction));
+  const line = sourceLineAt(nextDisplay);
+  if (line != null) selectLine(line, true);
+}
+
+function jumpToLine() {
+  const line = Math.max(1, Math.min(state.rowCount || 1, Number(els.jumpInput.value || 1))) - 1;
+  selectLine(line, true);
+}
+
+els.themeToggle.addEventListener("click", () => {
+  setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+});
 
 els.fileInput.addEventListener("change", async (event) => {
   const file = event.target.files[0];
@@ -441,8 +676,8 @@ els.fileInput.addEventListener("change", async (event) => {
   try {
     await openFile(file);
   } catch (error) {
-    els.status.textContent = error.message;
-    els.detail.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+    setStatus(error.message);
+    els.detail.innerHTML = `<div class="error-state"><span>${escapeHtml(error.message)}</span></div>`;
   }
 });
 
@@ -450,16 +685,23 @@ els.loadSample.addEventListener("click", async () => {
   try {
     await loadSample();
   } catch (error) {
-    els.status.textContent = error.message;
-    els.detail.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+    setStatus(error.message);
+    els.detail.innerHTML = `<div class="error-state"><span>${escapeHtml(error.message)}</span></div>`;
   }
 });
 
+els.searchInput.addEventListener("input", runSearchDebounced);
+els.clearSearch.addEventListener("click", clearSearch);
 els.list.addEventListener("scroll", scheduleRenderRows);
+
 els.rows.addEventListener("click", (event) => {
   const button = event.target.closest("[data-line]");
   if (button) selectLine(Number(button.dataset.line));
 });
+
+els.prevRow.addEventListener("click", () => navigate(-1));
+els.nextRow.addEventListener("click", () => navigate(1));
+els.jumpInput.addEventListener("change", jumpToLine);
 
 els.tabs.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-tab]");
@@ -468,6 +710,7 @@ els.tabs.addEventListener("click", async (event) => {
   for (const tab of els.tabs.querySelectorAll("button")) {
     tab.classList.toggle("active", tab === button);
   }
+
   let row = state.rows.get(state.selected);
   if (row && !row.raw) {
     try {
@@ -475,28 +718,29 @@ els.tabs.addEventListener("click", async (event) => {
       row = fetched.row;
       state.rows.set(state.selected, { ...(state.rows.get(state.selected) || {}), ...row });
     } catch (error) {
-      els.detail.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+      els.detail.innerHTML = `<div class="error-state"><span>${escapeHtml(error.message)}</span></div>`;
       return;
     }
   }
   if (row) renderDetail(row);
 });
 
-els.jumpInput.addEventListener("change", () => {
-  const line = Math.max(1, Number(els.jumpInput.value || 1)) - 1;
-  selectLine(line, true);
-});
-
-els.searchButton.addEventListener("click", runSearch);
-els.searchInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") runSearch();
-});
-els.cancelSearch.addEventListener("click", () => {
-  if (worker) worker.postMessage({ type: "cancel-search" });
+window.addEventListener("keydown", (event) => {
+  const target = event.target;
+  const tag = target?.tagName;
+  if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
+  if (event.key === "ArrowDown" || event.key === "j") {
+    event.preventDefault();
+    navigate(1);
+  }
+  if (event.key === "ArrowUp" || event.key === "k") {
+    event.preventDefault();
+    navigate(-1);
+  }
 });
 
 if (worker) {
   loadSample().catch(() => {
-    els.status.textContent = "Open a JSONL file or load the local sample.";
+    setStatus("Open a JSONL file or load the sample.");
   });
 }
