@@ -12,7 +12,7 @@ It is designed for logs, evaluation datasets, model traces, and other newline-de
 
 ## Features
 
-- Rust/WASM newline scanner compiled to `wasm32-unknown-unknown`
+- Rust/WebAssembly newline scanner
 - Web Worker indexing so the UI stays responsive
 - Virtualized row list for large files
 - Lazy row parsing: JSON is parsed when a row is visible or selected
@@ -43,7 +43,7 @@ The included sample mirrors evaluation-style JSONL records with this shape:
 
 ## Requirements
 
-- Rust with the `wasm32-unknown-unknown` target
+- Rust with WebAssembly target support
 - A local HTTP server
 - A modern browser with Web Worker and WebAssembly support
 - Node.js only if you want to use the helper scripts
@@ -56,10 +56,10 @@ rustup target add wasm32-unknown-unknown
 
 ## Run Locally
 
-Build the WASM module:
+Build the WebAssembly module:
 
 ```sh
-cargo build --release --target wasm32-unknown-unknown
+npm run build:wasm
 ```
 
 Serve the project directory:
