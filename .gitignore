@@ -1,0 +1,14 @@
+.DS_Store
+
+# Rust build artifacts
+/target/
+
+# Local JSONL datasets and generated stress files
+*.jsonl
+!examples/*.jsonl
+*.jsonl.tmp
+
+# Local editor/system files
+.vscode/
+.idea/
+*.swp

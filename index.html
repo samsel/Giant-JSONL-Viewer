@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Forge JSONL</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <script>
+    if (location.protocol === "file:") {
+      document.body.innerHTML = '<div style="min-height:100vh;display:grid;place-items:center;background:#0d0e0b;color:#f4f1df;font:16px Avenir Next,Gill Sans,Trebuchet MS,sans-serif;text-align:center;padding:24px"><div><h1 style="margin:0 0 12px">Forge JSONL needs localhost</h1><p style="color:#a7a18e;max-width:560px">Chrome blocks this app&apos;s Web Worker and WASM module from file:// URLs. Redirecting to the local server now.</p><p><a style="color:#e9ca54" href="http://localhost:8765/index.html">Open http://localhost:8765/index.html</a></p></div></div>';
+      setTimeout(() => location.replace("http://localhost:8765/index.html"), 500);
+    }
+  </script>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="mark">{}</span>
+        <div>
+          <strong>Forge JSONL</strong>
+          <small id="engine">WASM worker warming up</small>
+        </div>
+      </div>
+
+      <div class="controls">
+        <label class="file-button">
+          <input id="fileInput" type="file" accept=".jsonl,.json,.txt,application/json">
+          <span>Open</span>
+        </label>
+        <button id="loadSample" type="button">Load Sample</button>
+        <button id="cancelSearch" type="button" hidden>Stop Search</button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div>
+        <p class="kicker">Rust/WASM offset index, lazy rows, browser-only</p>
+        <h1 id="headline">Inspect JSONL without turning it into a memory bonfire.</h1>
+      </div>
+      <div class="metrics">
+        <div><span id="fileSize">0 MB</span><small>file size</small></div>
+        <div><span id="rowCount">0</span><small>rows indexed</small></div>
+        <div><span id="indexTime">0 ms</span><small>index time</small></div>
+      </div>
+    </section>
+
+    <main class="workspace">
+      <aside class="rail">
+        <div class="searchbar">
+          <input id="searchInput" type="search" placeholder="Stream search text, tags, rubrics">
+          <button id="searchButton" type="button">Search</button>
+        </div>
+        <div id="status" class="status">Open a JSONL file or load the local sample.</div>
+        <div class="jump">
+          <label for="jumpInput">Jump to line</label>
+          <input id="jumpInput" type="number" min="1" value="1">
+        </div>
+        <div id="list" class="list" aria-label="JSONL rows">
+          <div id="spacer" class="spacer"></div>
+          <div id="rows" class="rows"></div>
+        </div>
+      </aside>
+
+      <section class="inspector">
+        <div class="inspector-head">
+          <div>
+            <span id="lineLabel" class="line-label">No row selected</span>
+            <h2 id="rowTitle">Open a file to begin</h2>
+          </div>
+          <div class="tabs" role="tablist">
+            <button class="active" data-tab="summary" type="button">Summary</button>
+            <button data-tab="tree" type="button">Tree</button>
+            <button data-tab="raw" type="button">Raw</button>
+          </div>
+        </div>
+        <div id="detail" class="detail">
+          <div class="empty">This build indexes line starts first. Row JSON is parsed only when you select or render it.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>

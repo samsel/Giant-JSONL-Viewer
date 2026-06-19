@@ -1,0 +1,14 @@
+{
+  "name": "forge-jsonl",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:wasm": "node scripts/cargo.mjs build --release --target wasm32-unknown-unknown",
+    "check:wasm": "node scripts/cargo.mjs check --target wasm32-unknown-unknown",
+    "serve": "python3 -m http.server 8765",
+    "dev": "npm run build:wasm && npm run serve",
+    "generate": "node scripts/generate-synthetic-jsonl.mjs",
+    "generate:1m": "node scripts/generate-synthetic-jsonl.mjs 1000000 1m_test.jsonl"
+  }
+}
