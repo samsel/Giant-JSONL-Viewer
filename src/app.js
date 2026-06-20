@@ -4,16 +4,19 @@ const DENSITY_BUCKETS = 44;
 const SEARCH_LIMIT = 4000;
 const SAMPLE_FILE = "./examples/sample.jsonl";
 const SAMPLE_NAME = "sample.jsonl";
+const ASSET_VERSION = "20260619-clear";
+const EMPTY_FILE_NAME = "No file loaded";
 
 const state = {
   ready: false,
+  busy: false,
   rowCount: 0,
   selected: -1,
   rows: new Map(),
   tab: "summary",
   matches: null,
   query: "",
-  fileName: "No file loaded",
+  fileName: EMPTY_FILE_NAME,
   fileSize: 0,
   indexTime: 0,
 };
@@ -30,6 +33,7 @@ const els = {
   engine: document.getElementById("engine"),
   fileInput: document.getElementById("fileInput"),
   loadSample: document.getElementById("loadSample"),
+  clearFile: document.getElementById("clearFile"),
   themeToggle: document.getElementById("themeToggle"),
   currentFileName: document.getElementById("currentFileName"),
   statFileSize: document.getElementById("statFileSize"),
@@ -57,7 +61,9 @@ const els = {
 initTheme();
 
 try {
-  worker = new Worker("./src/worker.js", { type: "module" });
+  worker = new Worker(new URL(`./worker.js?v=${ASSET_VERSION}`, import.meta.url), {
+    type: "module",
+  });
 } catch (_error) {
   showFatal(
     "This browser blocked the worker. Serve the app from http://localhost:8765/index.html instead of opening index.html directly."
@@ -149,6 +155,7 @@ function showFatal(message) {
   els.detail.innerHTML = `<div class="error-state"><span>${escapeHtml(message)}</span></div>`;
   els.fileInput.disabled = true;
   els.loadSample.disabled = true;
+  els.clearFile.disabled = true;
 }
 
 function setStatus(message) {
@@ -156,9 +163,16 @@ function setStatus(message) {
 }
 
 function setBusy(isBusy, message) {
-  els.fileInput.disabled = isBusy;
-  els.loadSample.disabled = isBusy;
+  state.busy = isBusy;
+  updateControls();
   if (message) setStatus(message);
+}
+
+function updateControls() {
+  const hasFile = state.fileName !== EMPTY_FILE_NAME;
+  els.fileInput.disabled = state.busy;
+  els.loadSample.disabled = state.busy;
+  els.clearFile.disabled = state.busy || !hasFile;
 }
 
 function updateMeta() {
@@ -168,6 +182,7 @@ function updateMeta() {
   els.statIndexTime.textContent = `indexed ${Math.round(state.indexTime)} ms`;
   els.densityEnd.textContent = `line ${formatNumber(state.rowCount)}`;
   els.jumpInput.max = String(state.rowCount || 1);
+  updateControls();
 }
 
 function formatBytes(bytes) {
@@ -254,6 +269,38 @@ async function loadSample() {
   if (!response.ok) throw new Error(`Could not fetch sample: ${response.status}`);
   const blob = await response.blob();
   await openFile(new File([blob], SAMPLE_NAME, { type: "application/jsonl" }));
+}
+
+async function clearCurrentFile() {
+  searchToken++;
+  window.clearTimeout(searchTimer);
+  if (worker) {
+    worker.postMessage({ type: "cancel-search" });
+    await callWorker("clear-file");
+  }
+
+  state.rows.clear();
+  state.rowCount = 0;
+  state.selected = -1;
+  state.matches = null;
+  state.query = "";
+  state.fileName = EMPTY_FILE_NAME;
+  state.fileSize = 0;
+  state.indexTime = 0;
+  els.fileInput.value = "";
+  els.searchInput.value = "";
+  els.clearSearch.hidden = true;
+  els.density.hidden = true;
+  els.spacer.style.height = "0px";
+  els.rows.innerHTML = "";
+  els.list.scrollTop = 0;
+  els.jumpInput.value = "1";
+  updateMeta();
+  setStatus("Open a JSONL file or load the sample.");
+  renderEmpty(
+    "Open a JSONL file or load the sample",
+    "Files stay in this browser. Nothing is indexed until you choose a file or press Load sample."
+  );
 }
 
 function visibleTotal() {
@@ -686,6 +733,15 @@ els.fileInput.addEventListener("change", async (event) => {
 els.loadSample.addEventListener("click", async () => {
   try {
     await loadSample();
+  } catch (error) {
+    setStatus(error.message);
+    els.detail.innerHTML = `<div class="error-state"><span>${escapeHtml(error.message)}</span></div>`;
+  }
+});
+
+els.clearFile.addEventListener("click", async () => {
+  try {
+    await clearCurrentFile();
   } catch (error) {
     setStatus(error.message);
     els.detail.innerHTML = `<div class="error-state"><span>${escapeHtml(error.message)}</span></div>`;

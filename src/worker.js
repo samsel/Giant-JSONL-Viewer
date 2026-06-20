@@ -1,4 +1,6 @@
 const CHUNK_SIZE = 8 * 1024 * 1024;
+const WASM_URL =
+  "../target/wasm32-unknown-unknown/release/giant_jsonl_viewer.wasm?v=20260619-clear";
 
 let wasm = null;
 let wasmReady = false;
@@ -10,10 +12,7 @@ let wasmInit = null;
 
 async function initWasm() {
   try {
-    const module = await WebAssembly.instantiateStreaming(
-      fetch("../target/wasm32-unknown-unknown/release/giant_jsonl_viewer.wasm"),
-      {}
-    );
+    const module = await WebAssembly.instantiateStreaming(fetch(WASM_URL), {});
     wasm = module.instance;
     wasmReady = true;
     postMessage({ type: "ready", wasm: true });
@@ -87,6 +86,14 @@ async function openFile(nextFile) {
     elapsed: performance.now() - started,
     engine: wasmReady ? "Rust/WASM" : "JS fallback",
   };
+}
+
+function clearFile() {
+  searchCancelled = true;
+  file = null;
+  offsets = [0];
+  rowCount = 0;
+  return { rowCount };
 }
 
 function lineBounds(line) {
@@ -196,6 +203,8 @@ self.onmessage = async (event) => {
     if (message.type === "open-file") {
       const result = await openFile(message.file);
       postMessage({ id: message.id, ...result });
+    } else if (message.type === "clear-file") {
+      postMessage({ id: message.id, ...clearFile() });
     } else if (message.type === "rows") {
       postMessage({ id: message.id, rows: await getRows(message.lines) });
     } else if (message.type === "row-detail") {

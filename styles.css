@@ -1014,6 +1014,15 @@ mark {
     flex-basis: 100%;
   }
 
+  .top-actions {
+    flex-wrap: wrap;
+  }
+
+  .button {
+    height: 34px;
+    padding: 0 12px;
+  }
+
   .workspace {
     flex-direction: column;
   }
