@@ -373,6 +373,8 @@ function renderEmpty(title, body) {
   els.lineLabel.textContent = "No row selected";
   els.domainLabel.textContent = "dataset";
   els.rowTitle.textContent = title;
+  els.prevRow.disabled = true;
+  els.nextRow.disabled = true;
   els.detail.innerHTML = `
     <div class="empty-state">
       <div>
@@ -740,7 +742,9 @@ window.addEventListener("keydown", (event) => {
 });
 
 if (worker) {
-  loadSample().catch(() => {
-    setStatus("Open a JSONL file or load the sample.");
-  });
+  updateMeta();
+  renderEmpty(
+    "Open a JSONL file or load the sample",
+    "Files stay in this browser. Nothing is indexed until you choose a file or press Load sample."
+  );
 }
