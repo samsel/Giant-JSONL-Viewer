@@ -125,6 +125,21 @@ The generated `sample/1m_test.jsonl` is several GB. The entire `sample/` directo
     └── worker.js
 ```
 
+## Architecture
+
+```mermaid
+flowchart LR
+  User["User selects JSONL file"] --> Browser["Browser UI<br/>index.html + app.js"]
+  Browser --> Worker["Web Worker<br/>src/worker.js"]
+  Worker --> Wasm["Rust/WASM newline scanner<br/>src/lib.rs"]
+  Worker --> Index["Byte-offset line index<br/>line start positions"]
+  Browser --> VirtualList["Virtualized row list"]
+  VirtualList --> Worker
+  Worker --> Slice["Blob.slice(start, end)<br/>read only requested rows"]
+  Slice --> Parse["Lazy JSON parse"]
+  Parse --> Inspector["Summary / Tree / Raw inspector"]
+```
+
 ## How It Works
 
 1. The browser passes a `File` object to a module Worker.
