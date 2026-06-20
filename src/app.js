@@ -4,7 +4,7 @@ const DENSITY_BUCKETS = 44;
 const SEARCH_LIMIT = 4000;
 const SAMPLE_FILE = "./examples/sample.jsonl";
 const SAMPLE_NAME = "sample.jsonl";
-const ASSET_VERSION = "20260619-clear";
+const ASSET_VERSION = "20260619-offset-index";
 const EMPTY_FILE_NAME = "No file loaded";
 
 const state = {

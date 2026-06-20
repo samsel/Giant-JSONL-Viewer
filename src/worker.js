@@ -1,11 +1,44 @@
 const CHUNK_SIZE = 8 * 1024 * 1024;
+const OFFSET_CHUNK_LENGTH = 1_048_576;
 const WASM_URL =
-  "../target/wasm32-unknown-unknown/release/giant_jsonl_viewer.wasm?v=20260619-clear";
+  "../target/wasm32-unknown-unknown/release/giant_jsonl_viewer.wasm?v=20260619-offset-index";
+
+class LineOffsetIndex {
+  constructor(chunkLength = OFFSET_CHUNK_LENGTH) {
+    this.chunkLength = chunkLength;
+    this.chunks = [];
+    this.length = 0;
+    this.reset(false);
+  }
+
+  reset(includeFirstLine) {
+    this.chunks = [];
+    this.length = 0;
+    if (includeFirstLine) this.push(0);
+  }
+
+  push(offset) {
+    const chunkIndex = Math.floor(this.length / this.chunkLength);
+    const valueIndex = this.length % this.chunkLength;
+    if (!this.chunks[chunkIndex]) {
+      this.chunks[chunkIndex] = new Float64Array(this.chunkLength);
+    }
+    this.chunks[chunkIndex][valueIndex] = offset;
+    this.length++;
+  }
+
+  get(index) {
+    if (index < 0 || index >= this.length) return undefined;
+    const chunkIndex = Math.floor(index / this.chunkLength);
+    const valueIndex = index % this.chunkLength;
+    return this.chunks[chunkIndex][valueIndex];
+  }
+}
 
 let wasm = null;
 let wasmReady = false;
 let file = null;
-let offsets = [0];
+const offsets = new LineOffsetIndex();
 let rowCount = 0;
 let searchCancelled = false;
 let wasmInit = null;
@@ -54,7 +87,7 @@ function scanNewlinesWasm(bytes) {
 async function openFile(nextFile) {
   if (wasmInit) await wasmInit;
   file = nextFile;
-  offsets = [0];
+  offsets.reset(true);
   rowCount = 0;
   const started = performance.now();
   let cursor = 0;
@@ -76,7 +109,7 @@ async function openFile(nextFile) {
 
   if (file.size === 0) {
     rowCount = 0;
-    offsets = [];
+    offsets.reset(false);
   } else {
     rowCount = offsets.length;
   }
@@ -91,14 +124,14 @@ async function openFile(nextFile) {
 function clearFile() {
   searchCancelled = true;
   file = null;
-  offsets = [0];
+  offsets.reset(false);
   rowCount = 0;
   return { rowCount };
 }
 
 function lineBounds(line) {
-  const start = offsets[line];
-  let end = line + 1 < offsets.length ? offsets[line + 1] - 1 : file.size;
+  const start = offsets.get(line);
+  let end = line + 1 < offsets.length ? offsets.get(line + 1) - 1 : file.size;
   if (end < start) end = start;
   return { start, end };
 }

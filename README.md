@@ -132,7 +132,7 @@ flowchart LR
   User["User selects JSONL file"] --> Browser["Browser UI<br/>index.html + app.js"]
   Browser --> Worker["Web Worker<br/>src/worker.js"]
   Worker --> Wasm["Rust/WASM newline scanner<br/>src/lib.rs"]
-  Worker --> Index["Byte-offset line index<br/>line start positions"]
+  Worker --> Index["Chunked Float64Array line index<br/>line start byte offsets"]
   Browser --> VirtualList["Virtualized row list"]
   VirtualList --> Worker
   Worker --> Slice["Blob.slice(start, end)<br/>read only requested rows"]
@@ -145,12 +145,12 @@ flowchart LR
 1. The browser passes a `File` object to a module Worker.
 2. The Worker reads the file in chunks.
 3. Rust/WASM scans each chunk for newline byte positions.
-4. The Worker stores line-start byte offsets.
+4. The Worker stores line-start byte offsets in a chunked `Float64Array` index.
 5. The UI uses virtual scrolling to request visible rows.
 6. The Worker uses `Blob.slice(start, end)` to read only needed rows.
 7. Selected rows are parsed into summary, tree, or raw views.
 
-This keeps memory usage much lower than loading and parsing the whole JSONL file into JavaScript objects.
+This keeps memory usage much lower than loading and parsing the whole JSONL file into JavaScript objects. The line index grows with row count, not file size, and stores offsets in typed-array chunks instead of a regular JavaScript array.
 
 ## Publishing to GitHub
 
