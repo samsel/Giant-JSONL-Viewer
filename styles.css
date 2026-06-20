@@ -618,6 +618,7 @@ mark {
 }
 
 .title-block {
+  flex: 1;
   min-width: 0;
 }
 
@@ -647,13 +648,15 @@ mark {
 }
 
 .inspector h2 {
-  max-width: 680px;
+  max-width: min(560px, 52vw);
   margin: 9px 0 0;
+  overflow: hidden;
   color: var(--ink);
   font-size: 19px;
   font-weight: 600;
   line-height: 1.32;
-  text-wrap: pretty;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .inspector-actions {
@@ -1040,5 +1043,9 @@ mark {
 
   .inspector-actions {
     align-items: flex-start;
+  }
+
+  .inspector h2 {
+    max-width: 100%;
   }
 }

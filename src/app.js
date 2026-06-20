@@ -436,7 +436,7 @@ function renderDetail(row) {
   const json = row.json || {};
   els.lineLabel.textContent = `Line ${formatNumber(row.index + 1)} · ${formatBytes(row.bytes)}`;
   els.domainLabel.textContent = domainLabel(json);
-  els.rowTitle.textContent = detailTitle(json, row.title);
+  els.rowTitle.textContent = headerTitle(json);
   els.prevRow.disabled = !canNavigate(-1);
   els.nextRow.disabled = !canNavigate(1);
 
@@ -459,10 +459,17 @@ function renderDetail(row) {
   }
 }
 
-function detailTitle(json, fallback) {
-  const prompt = promptMessages(json);
-  const userMessage = prompt.find((msg) => msg.role === "user") || prompt[0];
-  return userMessage?.content || json.title || json.id || fallback || "Selected row";
+function headerTitle(json) {
+  const identifier = json.prompt_id || json.id || json.title || json.canary;
+  if (!identifier) return "Selected row";
+  return compactText(identifier, 80);
+}
+
+function compactText(value, max) {
+  const text = String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > max ? `${text.slice(0, max - 1)}...` : text;
 }
 
 function domainLabel(json) {
