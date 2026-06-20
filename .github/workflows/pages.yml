@@ -29,10 +29,18 @@ jobs:
       - name: Build WASM
         run: cargo build --release --target wasm32-unknown-unknown
 
+      - name: Prepare static site
+        run: |
+          mkdir -p dist/src dist/examples dist/target/wasm32-unknown-unknown/release
+          cp index.html styles.css .nojekyll dist/
+          cp src/app.js src/worker.js dist/src/
+          cp examples/sample.jsonl dist/examples/
+          cp target/wasm32-unknown-unknown/release/giant_jsonl_viewer.wasm dist/target/wasm32-unknown-unknown/release/
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: .
+          path: dist
 
   deploy:
     environment:
